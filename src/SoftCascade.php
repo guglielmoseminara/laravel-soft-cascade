@@ -99,7 +99,6 @@ class SoftCascade implements SoftCascadeable
             $this->validateRelation($model, $relation);
 
             $modelRelation = $model->$relation();
-
             /**
              * Maintains compatibility fot get foreign key name on laravel old and new methods.
              *
@@ -118,9 +117,7 @@ class SoftCascade implements SoftCascadeable
             } elseif ($modelRelation instanceof MorphOneOrMany) {
                 extract($this->getMorphManyData($modelRelation, $foreignKeyIds));
             }
-
             $affectedRows = $this->affectedRows($modelRelation, $foreignKeyUse, $foreignKeyIdsUse);
-
             if ($action === 'restrict' && $affectedRows > 0) {
                 DB::rollBack(); //Rollback the transaction before throw exception
                 throw (new SoftCascadeRestrictedException())->setModel(get_class($modelRelation->getModel()), $foreignKeyUse, $foreignKeyIdsUse->toArray());
@@ -143,7 +140,7 @@ class SoftCascade implements SoftCascadeable
     {
         $relationConnection = $relation->getConnection()->getName();
         $relationTable = $relation->getTable();
-        $relationRelatedKey = $relation->getQualifiedRelatedPivotKeyName();
+        $relationRelatedKey = $relation->getRelatedKeyName();
         //Get related ids
         $foreignKeyIdsUse = DB::connection($relationConnection)
             ->table($relationTable)
@@ -153,10 +150,9 @@ class SoftCascade implements SoftCascadeable
         $foreignKeyUse = explode('.', $relationRelatedKey);
         $foreignKeyUse = end($foreignKeyUse);
         $foreignKeyIdsUse = array_column($foreignKeyIdsUse, $foreignKeyUse);
-
         return [
             'foreignKeyIdsUse' => collect($foreignKeyIdsUse),
-            'foreignKeyUse'    => $relation->getRelated()->getKeyName(),
+            'foreignKeyUse'    => $foreignKeyUse,
         ];
     }
 
@@ -196,8 +192,12 @@ class SoftCascade implements SoftCascadeable
      */
     protected function execute($relation, $foreignKey, $foreignKeyIds, $affectedRows)
     {
-        $relationModel = $relation->getQuery()->getModel();
-        $relationModel = new $relationModel();
+        if($relation instanceof BelongsToMany) {
+            $relationModel = $relation->newPivot();
+        } else {
+            $relationModel = $relation->getQuery()->getModel();
+            $relationModel = new $relationModel();
+        }
         if ($affectedRows > 0) {
             $relationModel = $relationModel->withTrashed()->whereIn($foreignKey, $foreignKeyIds)->limit($affectedRows);
             $this->run($relationModel->get([$relationModel->getModel()->getKeyName()]));
@@ -250,8 +250,12 @@ class SoftCascade implements SoftCascadeable
      */
     protected function affectedRows($relation, $foreignKey, $foreignKeyIds)
     {
-        $relationModel = $relation->getQuery()->getModel();
-        $relationModel = new $relationModel();
+        if($relation instanceof BelongsToMany) {
+            $relationModel = $relation->newPivot();
+        } else {
+            $relationModel = $relation->getQuery()->getModel();
+            $relationModel = new $relationModel();
+        }
 
         return $relationModel->withTrashed()->whereIn($foreignKey, $foreignKeyIds)->count();
     }
