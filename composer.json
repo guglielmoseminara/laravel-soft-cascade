@@ -1,6 +1,6 @@
 {
     "name": "guglielmoseminara/laravel-soft-cascade",
-    "description": "Laravel Cascade Soft Delete & Restore",
+    "description": "Laravel Cascade Soft Delete & Restoree",
     "type": "library",
     "require": {
         "php": "^7.1.3",
